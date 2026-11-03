@@ -191,6 +191,22 @@ if ($a === 'invite') {
     out(['key' => $k, 'name' => trim(arg('name'))]);
 }
 
+if ($a === 'forget') {
+    if (!$isAdmin) out(['error' => 'удалять людей может только админ'], 403);
+    $n = trim(arg('who'));
+    if ($n === $me) out(['error' => 'себя удалить нельзя'], 400);
+    if (!in_array($n, $people)) out(['error' => "нет такого человека: $n"], 400);
+    flock($lock, LOCK_EX);
+    save('keys', array_filter(load('keys', []), function ($v) use ($n) { return $v !== $n; }));
+    save('admins', array_values(array_diff(load('admins', []), [$n])));
+    $topics = load('topics', []);
+    foreach ($topics as &$tp) $tp['members'] = array_values(array_diff($tp['members'], [$n]));
+    unset($tp);
+    save('topics', $topics);
+    flock($lock, LOCK_UN);
+    out(['ok' => true]);
+}
+
 if ($isAI && in_array($a, ['new', 'add', 'kick'])) out(['error' => 'создавать темы и звать людей может только человек'], 403);
 
 if ($a === 'people') out($people);
@@ -601,4 +617,4 @@ if ($a === 'file') {
     exit;
 }
 
-out(['error' => 'неизвестное действие a, есть: me, people, topics, new, read, wait, post, react, add, rename, archive, file, aikey, invite'], 400);
+out(['error' => 'неизвестное действие a, есть: me, people, topics, new, read, wait, post, react, add, rename, archive, file, aikey, invite, forget'], 400);

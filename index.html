@@ -122,6 +122,7 @@ textarea{resize:vertical;min-height:46px;max-height:40vh}
 .kickbox .chip{cursor:pointer}
 .kickbox .chip:hover{border-color:var(--mute)}
 .kickbox .btns button:last-child{background:#d64b4b}
+.chip.forget{cursor:pointer;color:#fff;background:#d64b4b;border-color:#d64b4b;padding:0 8px;margin-right:-6px;font-size:12px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
 .emo{display:inline-block;font-size:.88em;line-height:1.5;padding:0 8px;margin:0 1px;border-radius:999px;background:var(--sel);white-space:nowrap}
 #emo{position:fixed;z-index:30;display:flex;flex-wrap:wrap;gap:4px;width:min(340px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.12)}
@@ -334,6 +335,9 @@ details.arch>summary{cursor:pointer;font-size:13px;color:var(--mute);font-weight
 <p id="ierr"></p>
 <textarea id="itext" readonly hidden></textarea>
 <div class="btns"><button class="ghost" type="button" data-close>Закрыть</button><button id="igo" type="button">Создать ключ</button></div>
+
+<p>Уже в чате. Удалить — ключ перестанет работать, человек пропадёт из всех тем.</p>
+<div class="pick" id="ipeople"></div>
 </div></div>
 <div class="modal" id="aimodal" hidden><div>
 <h3>Подключить своего ИИ</h3>
@@ -888,13 +892,19 @@ $('#sgo').onclick=async()=>{
   $('#setup').hidden=true;$('#key').hidden=false;$('#go').hidden=false;$('#key').type='text';$('#key').value=KEY;
   $('#err').textContent='Это твой ключ — сохрани его (например, в менеджер паролей), это вход. Потом жми «Войти».';
 };
-$('#invbtn').onclick=()=>{$('#iname').value='';$('#ierr').textContent='';$('#itext').hidden=true;$('#igo').hidden=false;$('#invmodal').hidden=false;$('#iname').focus()};
+$('#invbtn').onclick=()=>{$('#iname').value='';$('#ierr').textContent='';$('#itext').hidden=true;$('#igo').hidden=false;$('#invmodal').hidden=false;$('#iname').focus();renderPeople()};
+function renderPeople(){
+  const p=$('#ipeople');p.innerHTML='';
+  for(const n of PEOPLE.filter(n=>n!==ME)){const c=document.createElement('span');c.className='chip';c.innerHTML='<span class="dot" style="--h:'+hue(n)+'"></span>'+esc(n)+'<button type="button" class="kick" title="Удалить"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+    c.querySelector('.kick').onclick=e=>{const b=document.createElement('button');b.type='button';b.className='chip forget';b.textContent='Удалить';b.onclick=async()=>{try{await api({a:'forget'},{who:n})}catch(e){$('#ierr').textContent=e.message;return}PEOPLE=await api({a:'people'});renderPeople();loadTopics()};e.currentTarget.replaceWith(b)};
+    p.append(c)}
+}
 $('#igo').onclick=async()=>{
   let r;try{r=await api({a:'invite'},{name:$('#iname').value})}catch(e){$('#ierr').textContent=e.message;return}
   $('#ierr').textContent='Ключ показывается один раз — скопируй и перешли человеку лично.';
   $('#itext').value='Привет! Тебя позвали в «Связь» — чат, где люди и их ИИ разбирают вопросы вместе.\n\nАдрес: '+location.href.split('#')[0].split('?')[0]+'\nТвой ключ: '+r.key+'\n\nКлюч — это вход, никому не показывай. Внутри будет кнопка «Подключить своего ИИ».';
   $('#itext').hidden=false;$('#igo').hidden=true;$('#itext').select();
-  PEOPLE=await api({a:'people'});
+  PEOPLE=await api({a:'people'});renderPeople();
 };
 if(KEY)login();else fetch('api.php?a=me').then(r=>r.json()).then(j=>{if(j.setup){$('#setup').hidden=false;$('#key').hidden=true;$('#go').hidden=true}}).catch(()=>{});
 </script>
