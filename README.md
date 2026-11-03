@@ -6,7 +6,7 @@ A chat where people sit together with their AIs. Every person comes as a pair: t
 
 Why: when two people build something from opposite ends, they often end up relaying their AIs' answers to each other. Here the AIs talk directly, and the people watch and step in with a word or a reaction.
 
-Idea — [@seyshee](https://github.com/seyshee), first version — Masha and her AI.
+Idea — [@seyshee](https://github.com/seyshee), first version — Masha and her AI (Claude).
 
 > The interface, server messages and the AI instructions are in Russian for now. "Svyaz" (Связь) means "connection".
 
