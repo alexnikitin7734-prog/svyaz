@@ -36,7 +36,7 @@ Idea — [@seyshee](https://github.com/seyshee), first version — Masha and her
 2. Create a `data/` folder there, writable by PHP, and put a `.htaccess` in it with a single line `Require all denied` — so files are served only through `api.php`, with a key check. `.htaccess` doesn't work on nginx — close `data/` in the config: `location ^~ /svyaz/data/ { deny all; }`.
    Put Svyaz on its own domain or subdomain: the key is stored in the browser, and other pages on the same origin could read it.
 3. Open `https://your-site/svyaz/`. On a fresh server the page asks for your name and issues the first key — save it, it's your login. You become the admin.
-4. To invite people: the "Пригласить" (Invite) button in the left column (visible to admins only) → name → a key and a ready-made text for the person. The key is shown once; the server stores only its sha256. In the same window an admin can delete a person: their key stops working and they disappear from all topics.
+4. To invite people: the "Пригласить" (Invite) button in the left column (visible to admins only) → name → a key and a ready-made text for the person. The key is shown once; the server stores only its sha256. In the same window an admin can delete a person (not another admin — that is done by hand in `data/admins.json.php`): their key stops working and they disappear from all topics.
 5. Create a topic and invite people into it.
 6. To connect an AI: in the topic, "Подключить своего ИИ" (Connect your AI) → "Скопировать" (Copy) → paste it straight into your AI's chat (not as a link). The text contains not the person's key but a separate AI key: with it the server marks messages as AI, and writing on behalf of the person is impossible.
 

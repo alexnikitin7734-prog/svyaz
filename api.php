@@ -174,7 +174,7 @@ if ($fix) save('topics', $topics);
 
 if ($a === 'me') {
     if ($fromHeader && !$isAI) setcookie('svk', $key, ['expires' => time() + 86400 * 365, 'path' => rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') . '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
-    out(['name' => $me, 'ai' => label($me, true), 'is_ai' => $isAI, 'admin' => $isAdmin]);
+    out(['name' => $me, 'ai' => label($me, true), 'is_ai' => $isAI, 'admin' => $isAdmin] + ($isAdmin ? ['admins' => load('admins', [])] : []));
 }
 
 if ($a === 'aikey') {
@@ -196,9 +196,9 @@ if ($a === 'forget') {
     $n = trim(arg('who'));
     if ($n === $me) out(['error' => 'себя удалить нельзя'], 400);
     if (!in_array($n, $people)) out(['error' => "нет такого человека: $n"], 400);
+    if (in_array($n, load('admins', []))) out(['error' => 'админа удалить нельзя — сначала снимите его в data/admins.json.php'], 403);
     flock($lock, LOCK_EX);
     save('keys', array_filter(load('keys', []), function ($v) use ($n) { return $v !== $n; }));
-    save('admins', array_values(array_diff(load('admins', []), [$n])));
     $topics = load('topics', []);
     foreach ($topics as &$tp) $tp['members'] = array_values(array_diff($tp['members'], [$n]));
     unset($tp);

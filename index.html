@@ -379,7 +379,7 @@ const REACTS=[
   ['cool','прикольно',SV('<path d="M12 3l1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6z"/><path d="M19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7z"/>')],
 ];
 const HUES=[28,210,150,280,340,190,50,0,250,110];
-let KEY='',ME='',got=0,TY='',LV='',WORK=[],_ty=0,ADMIN=false,PEOPLE=[],TOPICS=[],T=null,last=0,gen=0,msgs={},R={},RX={},replyTo=0,quoteText='',toSet=new Set(),priv=false,files=[],seen={},shut={},notified={},goneSeen={},HOL={},live=false,atCur=null,_j=0;
+let KEY='',ME='',got=0,TY='',LV='',WORK=[],_ty=0,ADMIN=false,ADMINS=[],PEOPLE=[],TOPICS=[],T=null,last=0,gen=0,msgs={},R={},RX={},replyTo=0,quoteText='',toSet=new Set(),priv=false,files=[],seen={},shut={},notified={},goneSeen={},HOL={},live=false,atCur=null,_j=0;
 try{KEY=localStorage.getItem('svyazKey')||'';seen=JSON.parse(localStorage.getItem('svyazSeen')||'{}');shut=JSON.parse(localStorage.getItem('svyazShut')||'{}');goneSeen=JSON.parse(localStorage.getItem('svyazGone')||'{}')}catch(e){}
 const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -394,7 +394,7 @@ async function api(q,body){
   const j=r.status===204?null:await r.json();if(!r.ok){const e=new Error(j&&j.error||r.status);e.status=r.status;throw e}return j;
 }
 async function login(){
-  try{const me=await api({a:'me'});ME=me.name;ADMIN=me.admin;$('#invbtn').hidden=!me.admin}catch(e){$('#err').textContent=KEY?'Ключ не подошёл':'';return}
+  try{const me=await api({a:'me'});ME=me.name;ADMIN=me.admin;ADMINS=me.admins||[];$('#invbtn').hidden=!me.admin}catch(e){$('#err').textContent=KEY?'Ключ не подошёл':'';return}
   try{localStorage.setItem('svyazKey',KEY)}catch(e){}
   PEOPLE=await api({a:'people'});
   $('#login').style.display='none';$('#app').style.display='grid';$('#who').textContent=ME;
@@ -895,8 +895,8 @@ $('#sgo').onclick=async()=>{
 $('#invbtn').onclick=()=>{$('#iname').value='';$('#ierr').textContent='';$('#itext').hidden=true;$('#igo').hidden=false;$('#invmodal').hidden=false;$('#iname').focus();renderPeople()};
 function renderPeople(){
   const p=$('#ipeople');p.innerHTML='';
-  for(const n of PEOPLE.filter(n=>n!==ME)){const c=document.createElement('span');c.className='chip';c.innerHTML='<span class="dot" style="--h:'+hue(n)+'"></span>'+esc(n)+'<button type="button" class="kick" title="Удалить"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
-    c.querySelector('.kick').onclick=e=>{const b=document.createElement('button');b.type='button';b.className='chip forget';b.textContent='Удалить';b.onclick=async()=>{try{await api({a:'forget'},{who:n})}catch(e){$('#ierr').textContent=e.message;return}PEOPLE=await api({a:'people'});renderPeople();loadTopics()};e.currentTarget.replaceWith(b)};
+  for(const n of PEOPLE.filter(n=>n!==ME)){const c=document.createElement('span');c.className='chip';c.innerHTML='<span class="dot" style="--h:'+hue(n)+'"></span>'+esc(n)+(ADMINS.includes(n)?' · админ':'<button type="button" class="kick" title="Удалить"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>');
+    if(!ADMINS.includes(n))c.querySelector('.kick').onclick=e=>{const b=document.createElement('button');b.type='button';b.className='chip forget';b.textContent='Удалить';b.onclick=async()=>{try{await api({a:'forget'},{who:n})}catch(e){$('#ierr').textContent=e.message;return}PEOPLE=await api({a:'people'});renderPeople();loadTopics()};e.currentTarget.replaceWith(b)};
     p.append(c)}
 }
 $('#igo').onclick=async()=>{
