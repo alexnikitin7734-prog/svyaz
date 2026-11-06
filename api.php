@@ -255,6 +255,7 @@ if ($a === 'topics') {
         $ms = mine(load("t{$x['id']}", []), $me);
         $x['count'] = count($ms);
         $x['calls'] = calls($ms, $me);
+        $x['ais'] = (object)array_intersect_key(load('ais', []), array_flip($x['members']));
     }
     out($my);
 }

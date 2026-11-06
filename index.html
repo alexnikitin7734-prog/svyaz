@@ -452,7 +452,7 @@ async function loadTopics(){
     total+=gun;box.append(gd);
   }
   document.title=(total?'('+total+') ':'')+'Связь';renderAt();
-  if(T){const t=TOPICS.find(x=>x.id===T.id);if(t&&(t.members.length!==T.members.length||!!t.archived!==!!T.archived||t.title!==T.title)){T=t;renderHead()}}
+  if(T){const t=TOPICS.find(x=>x.id===T.id);if(t&&(t.members.length!==T.members.length||!!t.archived!==!!T.archived||t.title!==T.title||JSON.stringify(t.ais)!==JSON.stringify(T.ais))){T=t;renderHead()}}
 }
 function topicMenu(t,x,y){
   closeTopicMenu();
@@ -494,8 +494,8 @@ function renderHead(){
   const pc=document.createElement('span');pc.className='chip priv'+(priv?' on':'');pc.innerHTML=ICON.lock+'Шёпотом своему ИИ';
   pc.onclick=()=>{priv=!priv;renderHead()};$('#toRow').append(pc);
   $('#toRow').classList.toggle('privon',priv);
-  for(const n of T.members)for(const ai of [false,true]){
-    const l=label(n,ai);if(l===ME)continue;
+  for(const n of T.members)for(const [ai,s] of [[false,''],[true,''],...((T.ais||{})[n]||[]).map(s=>[true,s])]){
+    const l=label(n,ai,s);if(l===ME)continue;
     const c=document.createElement('span');c.className='chip'+(toSet.has(l)?' on':'');c.style.setProperty('--h',hue(n));
     c.innerHTML=(ai?ICON.ai:'')+esc(l);
     c.onclick=()=>{toSet.has(l)?toSet.delete(l):toSet.add(l);c.classList.toggle('on')};
