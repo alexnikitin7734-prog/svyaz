@@ -255,7 +255,10 @@ if ($a === 'topics') {
         $ms = mine(load("t{$x['id']}", []), $me);
         $x['count'] = count($ms);
         $x['calls'] = calls($ms, $me);
-        $x['ais'] = (object)array_intersect_key(load('ais', []), array_flip($x['members']));
+        $x['ais'] = [];
+        $all = load('ais', []);
+        foreach ($ms as $m) if (!empty($m['sub']) && in_array($m['who'], $x['members']) && in_array($m['sub'], $all[$m['who']] ?? []) && !in_array($m['sub'], $x['ais'][$m['who']] ?? [])) $x['ais'][$m['who']][] = $m['sub'];
+        $x['ais'] = (object)$x['ais'];
     }
     out($my);
 }
