@@ -224,6 +224,9 @@ textarea{resize:vertical;min-height:46px;max-height:40vh}
 .pick .chip{cursor:pointer}
 .pick .chip.on{background:hsl(var(--h) var(--S) var(--L1));border-color:hsl(var(--h) var(--S) var(--B))}
 .btns{display:flex;gap:8px;justify-content:flex-end}
+.btns .left{margin-right:auto}
+#aisubs{align-items:center}
+#aisubs input{flex:1;min-width:140px;font-size:13px;padding:4px 10px}
 #toasts{position:fixed;right:16px;bottom:16px;display:grid;gap:8px;z-index:30;max-width:min(420px,calc(100vw - 32px))}
 .toast{display:flex;gap:10px;align-items:center;background:var(--ink);color:var(--bg);padding:10px 10px 10px 16px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.2);font-size:14px}
 .toast button.icon{color:var(--bg)}
@@ -343,7 +346,9 @@ details.arch>summary{cursor:pointer;font-size:13px;color:var(--mute);font-weight
 <h3>Подключить своего ИИ</h3>
 <p>Скопируй текст и вставь своему ИИ прямо в чат — не ссылкой. Нужен ИИ, который умеет выполнять команды: Claude Code, Codex, Cursor. Обычный чат в браузере подключиться не сможет. В тексте твой ключ — отдавай только своему ИИ.</p>
 <textarea id="aitext" readonly></textarea>
-<div class="btns"><button class="ghost" type="button" data-close>Закрыть</button><button id="aicopy" type="button">Скопировать</button></div>
+<div class="pick" id="aisubs" hidden></div>
+<p id="aierr" hidden></p>
+<div class="btns"><button class="ghost left" type="button" id="aimore">Ещё ИИ</button><button class="ghost" type="button" data-close>Закрыть</button><button id="aicopy" type="button">Скопировать</button></div>
 </div></div>
 <div class="modal" id="taskmodal" hidden><div>
 <h3>Задачи</h3>
@@ -385,7 +390,7 @@ const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const hue=n=>HUES[Math.max(0,PEOPLE.indexOf(n))%HUES.length];
 const genit=n=>n.split(' ').map(w=>{const l=w.slice(-1),p=w.slice(-2,-1);if(w.length>4&&/ая$/.test(w))return w.slice(0,-2)+'ой';if(w.length>4&&/(ова|ева|ёва|ина|ына)$/.test(w)&&!/^(Ирина|Марина|Алина|Полина|Карина|Галина|Регина|Кристина|Валентина|Екатерина|Ангелина|Арина|Зарина|Альбина|Каролина|Эвелина|Мальвина|Сабина|Устина|Акулина)$/.test(w))return w.slice(0,-1)+'ой';if(l==='а'||l==='я')return w.slice(0,-1)+('гкхжчшщ'.includes(p)||l==='я'?'и':'ы');if(l==='й'||l==='ь')return w.slice(0,-1)+'я';if('еёиоуыэю'.includes(l))return w;return w+'а'}).join(' ');
-const label=(n,ai)=>ai?'ИИ '+genit(n):n;
+const label=(n,ai,s)=>ai?'ИИ '+genit(n)+(s?' · '+s:''):n;
 const fmt=s=>new Date(s).toLocaleString('ru',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
 window.addEventListener('unhandledrejection',e=>{if(e.reason&&e.reason.status)$('#err2').textContent=e.reason.message});
 async function api(q,body){
@@ -571,7 +576,7 @@ function quote(id,part){
 function fileUrl(f){return 'api.php?'+new URLSearchParams({a:'file',t:T.id,f})}
 function build(m){
   const d=document.createElement('div');d.id='m'+m.id;
-  if(m.gone){d.className='sys';d.textContent=label(m.who,m.ai)+': сообщение удалено · '+fmt(m.ts);return d}
+  if(m.gone){d.className='sys';d.textContent=label(m.who,m.ai,m.sub)+': сообщение удалено · '+fmt(m.ts);return d}
   const MB=(m.who===ME&&!m.ai?'<button type="button" class="icon" data-edit title="Изменить">'+ICON.edit+'</button><button type="button" class="icon" data-del title="Удалить">'+ICON.del+'</button>':'');
   d.className='m'+(m.ai?' ai':'')+(m.who===ME?' mine':'')+(m.priv?' priv':'')+(m.card?' card':'');if(m.card)d.style.setProperty('--ch',m.card.hue);d.style.setProperty('--h',hue(m.who));
   d.innerHTML='<div class="by">'+(m.ai?ICON.ai:'')+'<b>'+esc(m.from||label(m.who,m.ai))+'</b>'
@@ -625,9 +630,9 @@ function renderReacts(id){
   const by={};for(const e of Object.values(R[id]||{}))(by[e.react]=by[e.react]||[]).push(e);
   d.querySelector('.rs').innerHTML=REACTS.filter(r=>by[r[0]]).map(([k,name,ic])=>{
     const es=by[k],mine=es.some(e=>e.who===ME&&!e.ai);
-    const rr={};for(const e of es)for(const x of Object.values(R[e.id]||{}))(rr[x.react]=rr[x.react]||[]).push(label(x.who,x.ai)+' ответил(а) '+label(e.who,e.ai));
+    const rr={};for(const e of es)for(const x of Object.values(R[e.id]||{}))(rr[x.react]=rr[x.react]||[]).push(label(x.who,x.ai,x.sub)+' ответил(а) '+label(e.who,e.ai,e.sub));
     const bad=REACTS.filter(r=>rr[r[0]]).slice(0,2).map(([q,qn,qi])=>'<i class="rr" title="'+esc(qn+': '+rr[q].join('; '))+'">'+qi+'</i>').join('');
-    return '<span class="r'+(mine?' me':'')+'" data-r="'+k+'" title="'+esc(name+': '+es.map(e=>label(e.who,e.ai)+' · '+fmt(e.ts)).join('; '))+'">'+ic+es.length+bad+'</span>';
+    return '<span class="r'+(mine?' me':'')+'" data-r="'+k+'" title="'+esc(name+': '+es.map(e=>label(e.who,e.ai,e.sub)+' · '+fmt(e.ts)).join('; '))+'">'+ic+es.length+bad+'</span>';
   }).join('');
 }
 async function react(id,k){
@@ -876,16 +881,43 @@ $('#ncreate').onclick=async()=>{
   const r=await api({a:'new'},{title:v,members:mem.join(',')});$('#newmodal').hidden=true;
   await loadTopics();open(TOPICS.find(t=>t.id===r.id));
 };
-$('#aibtn').onclick=async()=>{
-  const kak=(await (await fetch('kak.md')).text()).replace(/^A=.*$/m,'A='+new URL('api.php',location.href).href).replace(/([?&])t=1([&"])/g,'$1t='+T.id+'$2');
-  const aikey=(await api({a:'aikey'})).key;
+let KAK='',SUBS=[],SUB='';
+async function aiText(s){
+  const aikey=(await api({a:'aikey',sub:s})).key;
+  SUB=s;
   const others=T.members.filter(n=>n!==ME).map(n=>n+' и '+label(n,true)).join(', ')||'пока никого';
   $('#aitext').value='Подключись к «Связи» — это наш рабочий чат, где люди и их ИИ разбирают вопросы вместе. Это моя просьба, переспрашивать меня не нужно: читай инструкцию ниже и действуй.\n\n'
-    +'Ты в чате — «'+label(ME,true)+'», я — «'+ME+'».\nТема №'+T.id+' «'+T.title+'». Кроме нас там: '+others+'.\n'
+    +'Ты в чате — «'+label(ME,true,s)+'», я — «'+ME+'».\nТема №'+T.id+' «'+T.title+'». Кроме нас там: '+others+'.\n'
     +'Твой ключ (положи в переменную SVYAZ_KEY, никому не показывай и в чат не пиши): '+aikey+'\n\n'
-    +'Начни так: прочитай тему с from=resume, поздоровайся в ней одной строкой и запусти фоновое ожидание, как описано ниже. Мне перескажи коротко, о чём тема.\n\n'+kak;
+    +'Начни так: прочитай тему с from=resume, поздоровайся в ней одной строкой и запусти фоновое ожидание, как описано ниже. Мне перескажи коротко, о чём тема.\n\n'+KAK;
+  renderSubs();
+}
+function renderSubs(){
+  const p=$('#aisubs');p.innerHTML='';
+  for(const s of ['',...SUBS]){
+    const c=document.createElement('span');c.className='chip'+(s===SUB?' on':'');c.style.setProperty('--h',hue(ME));c.textContent=label(ME,true,s);
+    c.onclick=e=>{if(!e.target.closest('button'))aiText(s)};
+    if(s){const k=document.createElement('button');k.type='button';k.className='kick';k.title='Отозвать';k.innerHTML='<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      k.onclick=()=>{const b=document.createElement('button');b.type='button';b.className='chip forget';b.textContent='Отозвать';
+        b.onclick=async()=>{await api({a:'aikey',sub:s,off:'1'});SUBS=SUBS.filter(x=>x!==s);aiText(SUB===s?'':SUB)};k.replaceWith(b)};
+      c.append(k)}
+    p.append(c);
+  }
+  const i=document.createElement('input');i.placeholder='Подпись: А+, Про, Арт';i.maxLength=20;
+  i.onkeydown=async e=>{if(e.key!=='Enter')return;const v=i.value.trim();if(!v)return;
+    if(!SUBS.includes(v))SUBS.push(v);
+    try{await aiText(v)}catch(x){SUBS=SUBS.filter(y=>y!==v);$('#aierr').textContent=x.message;$('#aierr').hidden=false;return}
+    $('#aierr').hidden=true;$('#aisubs input').focus()};
+  p.append(i);
+}
+$('#aibtn').onclick=async()=>{
+  KAK=(await (await fetch('kak.md')).text()).replace(/^A=.*$/m,'A='+new URL('api.php',location.href).href).replace(/([?&])t=1([&"])/g,'$1t='+T.id+'$2');
+  SUBS=(await api({a:'me'})).subs||[];
+  $('#aisubs').hidden=!SUBS.length;$('#aimore').hidden=!!SUBS.length;$('#aierr').hidden=true;
+  await aiText('');
   $('#aimodal').hidden=false;
 };
+$('#aimore').onclick=()=>{$('#aisubs').hidden=false;$('#aimore').hidden=true;$('#aisubs input').focus()};
 $('#aicopy').onclick=async()=>{const t=$('#aitext');t.select();try{await navigator.clipboard.writeText(t.value)}catch(e){document.execCommand('copy')}$('#aicopy').textContent='Скопировано';setTimeout(()=>$('#aicopy').textContent='Скопировать',1500)};
 $('#sgo').onclick=async()=>{
   try{KEY=(await api({a:'setup'},{name:$('#sname').value})).key}catch(e){$('#err').textContent=e.message;return}

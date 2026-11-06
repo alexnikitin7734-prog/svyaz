@@ -95,8 +95,8 @@ function gen($n) {
     }, explode(' ', $n)));
 }
 
-function label($name, $ai) {
-    return $ai ? 'ИИ ' . gen($name) : $name;
+function label($name, $ai, $sub = '') {
+    return $ai ? 'ИИ ' . gen($name) . ($sub !== '' ? " · $sub" : '') : $name;
 }
 
 function labels($members) {
@@ -104,13 +104,14 @@ function labels($members) {
     foreach ($members as $n) {
         $l[] = label($n, false);
         $l[] = label($n, true);
+        foreach (load('ais', [])[$n] ?? [] as $s) $l[] = label($n, true, $s);
     }
     usort($l, function ($a, $b) { return mb_strlen($b) - mb_strlen($a); });
     return $l;
 }
 
 function view($m) {
-    if (empty($m['sys'])) $m['from'] = label($m['who'], $m['ai']);
+    if (empty($m['sys'])) $m['from'] = label($m['who'], $m['ai'], $m['sub'] ?? '');
     if (isset($m['react'])) $m['meaning'] = REACTS[$m['react']] . (empty($m['off']) ? '' : ' (снято)');
     return $m;
 }
@@ -121,9 +122,14 @@ $keys = load('keys', []);
 $secret = load('secret', '');
 if ($secret === '' && !is_file(D . '/secret.json.php')) save('secret', $secret = bin2hex(random_bytes(32)));
 $isAI = false;
+$sub = '';
 $h = hash('sha256', $key);
 if (strpos($key, 'ai-') === 0) {
-    foreach ($keys as $kh => $name) if (hash_equals('ai-' . hash_hmac('sha256', $kh, $secret), $key)) { $h = $kh; $isAI = true; }
+    $ais = load('ais', []);
+    foreach ($keys as $kh => $name) {
+        if (hash_equals('ai-' . hash_hmac('sha256', $kh, $secret), $key)) { $h = $kh; $isAI = true; }
+        foreach ($ais[$name] ?? [] as $s) if (hash_equals('ai-' . hash_hmac('sha256', "$kh|$s", $secret), $key)) { $h = $kh; $isAI = true; $sub = $s; }
+    }
 }
 function newKey($name) {
     global $keys;
@@ -147,6 +153,7 @@ $me = $keys[$h];
 $people = array_values(array_unique(array_values($keys)));
 $isAdmin = !$isAI && in_array($me, load('admins', []));
 function aiFlag() { global $isAI; return $isAI || arg('ai') === '1'; }
+function own($m) { global $me, $sub; return $m['who'] === $me && $m['ai'] && ($m['sub'] ?? '') === $sub; }
 
 const EMO = ['не знаю' => '🤷', 'думаю' => '🤔🧐', 'косяк' => '😬😅🙈', 'ступор' => '😪😶😑😐🫠', 'позязя' => '🥺😇🙏', 'плачу' => '😢😭😿',
     'эээ' => '🗿😳', 'всё в ажуре' => '🤓👌😎👍', 'серьёзно?' => '🙄😒🤦', 'танцую' => '💃🕺👯🎉🥳', 'смеюсь' => '😂🤣😆😁😄😃😀😹',
@@ -174,12 +181,22 @@ if ($fix) save('topics', $topics);
 
 if ($a === 'me') {
     if ($fromHeader && !$isAI) setcookie('svk', $key, ['expires' => time() + 86400 * 365, 'path' => rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') . '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Strict']);
-    out(['name' => $me, 'ai' => label($me, true), 'is_ai' => $isAI, 'admin' => $isAdmin] + ($isAdmin ? ['admins' => load('admins', [])] : []));
+    out(['name' => $me, 'ai' => label($me, true, $sub), 'is_ai' => $isAI, 'admin' => $isAdmin] + ($isAdmin ? ['admins' => load('admins', [])] : []) + ($isAI ? [] : ['subs' => load('ais', [])[$me] ?? []]));
 }
 
 if ($a === 'aikey') {
     if ($isAI) out(['error' => 'ИИ-ключ выдаёт только человек'], 403);
-    out(['key' => 'ai-' . hash_hmac('sha256', $h, $secret)]);
+    $s = trim(arg('sub'));
+    if ($s === '') out(['key' => 'ai-' . hash_hmac('sha256', $h, $secret)]);
+    if (!preg_match('//u', $s) || mb_strlen($s) > 20 || preg_match('/[,@<>·]/u', $s)) out(['error' => 'подпись: до 20 символов, без запятых, @ и ·'], 400);
+    flock($lock, LOCK_EX);
+    $ais = load('ais', []);
+    $l = array_values(array_diff($ais[$me] ?? [], [$s]));
+    if (arg('off') !== '1') $l[] = $s;
+    if ($l) $ais[$me] = $l; else unset($ais[$me]);
+    save('ais', $ais);
+    flock($lock, LOCK_UN);
+    out(arg('off') === '1' ? ['ok' => true] : ['key' => 'ai-' . hash_hmac('sha256', "$h|$s", $secret), 'ai' => label($me, true, $s)]);
 }
 
 if ($a === 'invite') {
@@ -293,13 +310,14 @@ function append($t, $ti, $m) {
 }
 
 function wanted($m, $me, $msgs) {
-    $mine = label($me, true);
+    global $sub;
+    $mine = label($me, true, $sub);
     if (isset($m['react'])) {
-        foreach ($msgs as $x) if ($x['id'] === $m['on']) return $x['who'] === $me && $x['ai'] && !($m['who'] === $me && $m['ai']);
+        foreach ($msgs as $x) if ($x['id'] === $m['on']) return own($x) && !own($m);
         return false;
     }
     if (!empty($m['sys']) || isset($m['del'])) return false;
-    if ($m['who'] === $me && $m['ai']) return false;
+    if (own($m)) return false;
     if (isset($m['edit'])) {
         foreach ($msgs as $x) if ($x['id'] === $m['edit']) return empty($x['to']) || in_array($mine, $x['to']);
         return false;
@@ -383,7 +401,7 @@ if ($a === 'typing') {
 }
 
 if ($a === 'read' || $a === 'wait') {
-    if ($isAI && $a === 'wait') { pres($t, $me, 'wait'); worked($t, $me, 'wait'); }
+    if ($isAI && $sub === '' && $a === 'wait') { pres($t, $me, 'wait'); worked($t, $me, 'wait'); }
     $since = (int)arg('since');
     $wait = min(20, max(0, (int)arg('wait', $a === 'wait' ? 20 : 0)));
     $end = time() + $wait;
@@ -403,7 +421,7 @@ if ($a === 'read' || $a === 'wait') {
         if ($hit || time() >= $end) break;
         sleep(1);
     }
-    if ($isAI && $a === 'wait') {
+    if ($isAI && $sub === '' && $a === 'wait') {
         pres($t, $me, $hit ? 'hit' : 'idle');
         $on = 0;
         foreach ($hit as $m) if (!isset($m['react']) && !isset($m['edit']) && !isset($m['del']) && empty($m['priv'])) $on = max($on, $m['id']);
@@ -414,7 +432,7 @@ if ($a === 'read' || $a === 'wait') {
         exit;
     }
     $topic = load('topics', [])[$ti];
-    out(['topic' => $topic, 'me' => $me, 'my_ai' => label($me, true), 'holiday' => holidayOn(today()), 'ai_state' => presence($t, $topic['members'])] + live($t, $me) + ['messages' => array_map('view', $new)]);
+    out(['topic' => $topic, 'me' => $me, 'my_ai' => label($me, true, $sub), 'holiday' => holidayOn(today()), 'ai_state' => presence($t, $topic['members'])] + live($t, $me) + ['messages' => array_map('view', $new)]);
 }
 
 if ($a === 'post') {
@@ -462,8 +480,8 @@ if ($a === 'post') {
         }
         if ($run >= AI_RUN) out(['error' => 'ИИ уже написали ' . AI_RUN . ' сообщений подряд — дождись, пока ответит человек', 'limit' => true], 429);
     }
-    if (aiFlag() && (int)arg('reply')) foreach (load("t$t", []) as $x) if ($x['id'] === (int)arg('reply') && !($x['who'] === $me && $x['ai']) && !empty($x['to']) && !in_array(label($me, true), $x['to'])) out(['error' => '№' . $x['id'] . ' адресовано ' . implode(', ', $x['to']) . ', не тебе — не отвечай, читай для контекста'], 409);
-    $m = ['who' => $me, 'ai' => aiFlag(), 'text' => mb_substr($text, 0, 20000)];
+    if (aiFlag() && (int)arg('reply')) foreach (load("t$t", []) as $x) if ($x['id'] === (int)arg('reply') && !own($x) && !empty($x['to']) && !in_array(label($me, true, $sub), $x['to'])) out(['error' => '№' . $x['id'] . ' адресовано ' . implode(', ', $x['to']) . ', не тебе — не отвечай, читай для контекста'], 409);
+    $m = ['who' => $me, 'ai' => aiFlag(), 'text' => mb_substr($text, 0, 20000)] + ($sub !== '' ? ['sub' => $sub] : []);
     if (arg('ask') === '1') $m['ask'] = true;
     if (arg('priv') === '1') $m['priv'] = true;
     elseif ($to) $m['to'] = array_values(array_unique($to));
@@ -471,10 +489,10 @@ if ($a === 'post') {
     if ((int)arg('reply') && trim(arg('quote')) !== '') $m['quote'] = mb_substr(trim(arg('quote')), 0, 1000);
     if ($files) $m['files'] = $files;
     if ($card) $m['card'] = ['name' => $card['name'], 'hue' => $card['hue']];
-    if ($isAI) pres($t, $me, 'post');
+    if ($isAI && $sub === '') pres($t, $me, 'post');
     elseif (!aiFlag()) typed($t, $me, false);
     $id = append($t, $ti, $m);
-    if ($isAI && empty($m['priv'])) worked($t, $me, 'post', $id);
+    if ($isAI && $sub === '' && empty($m['priv'])) worked($t, $me, 'post', $id);
     out(['id' => $id]);
 }
 
@@ -504,7 +522,7 @@ if ($a === 'task') {
     if (arg('prio') !== '') { $k['prio'] = (int)arg('prio'); $what[] = 'приоритет ' . $k['prio']; }
     if (arg('info') !== '') { $k['info'] = mb_substr(trim(arg('info')), 0, 5000); $what[] = 'инфо обновлено'; }
     if (arg('note') !== '') $what[] = mb_substr(trim(arg('note')), 0, 500);
-    $e = ['ts' => date('c'), 'by' => label($me, true), 'what' => implode('; ', $what)];
+    $e = ['ts' => date('c'), 'by' => label($me, true, $sub), 'what' => implode('; ', $what)];
     if ((int)arg('msg')) $e['msg'] = (int)arg('msg');
     $k['log'][] = $e;
     $k['upd'] = date('c');
@@ -517,7 +535,7 @@ if ($a === 'task') {
 if ($a === 'react') {
     $r = arg('r');
     if (!isset(REACTS[$r])) out(['error' => 'r — одна из: ' . implode(', ', array_keys(REACTS))], 400);
-    $m = ['who' => $me, 'ai' => aiFlag(), 'react' => $r, 'on' => (int)arg('on')];
+    $m = ['who' => $me, 'ai' => aiFlag(), 'react' => $r, 'on' => (int)arg('on')] + ($sub !== '' ? ['sub' => $sub] : []);
     if (arg('off') === '1') $m['off'] = true;
     foreach (load("t$t", []) as $x) if ($x['id'] === $m['on'] && !empty($x['priv'])) $m['priv'] = true;
     out(['id' => append($t, $ti, $m)]);
@@ -532,17 +550,17 @@ if ($a === 'edit' || $a === 'del') {
     $i = array_search($on, array_column($msgs, 'id'));
     $x = $i === false ? null : $msgs[$i];
     if (!$x || !empty($x['sys']) || isset($x['react']) || isset($x['edit']) || isset($x['del']) || !empty($x['gone'])) { flock($lock, LOCK_UN); out(['error' => "нет сообщения $on"], 404); }
-    if ($x['who'] !== $me || $x['ai'] !== aiFlag()) { flock($lock, LOCK_UN); out(['error' => 'править и удалять можно только свои сообщения'], 403); }
+    if ($x['who'] !== $me || $x['ai'] !== aiFlag() || ($x['sub'] ?? '') !== $sub) { flock($lock, LOCK_UN); out(['error' => 'править и удалять можно только свои сообщения'], 403); }
     if ($a === 'edit') {
         $msgs[$i]['text'] = mb_substr($text, 0, 20000);
         $msgs[$i]['edited'] = date('c');
-        $e = ['who' => $me, 'ai' => aiFlag(), 'edit' => $on, 'text' => $msgs[$i]['text']];
+        $e = ['who' => $me, 'ai' => aiFlag(), 'edit' => $on, 'text' => $msgs[$i]['text']] + ($sub !== '' ? ['sub' => $sub] : []);
     } else {
         foreach ($x['files'] ?? [] as $f) @unlink(D . '/f/' . basename($f['f']));
-        $msgs[$i] = ['id' => $on, 'who' => $me, 'ai' => $x['ai'], 'gone' => true, 'ts' => $x['ts']] + (empty($x['priv']) ? [] : ['priv' => true]);
+        $msgs[$i] = ['id' => $on, 'who' => $me, 'ai' => $x['ai'], 'gone' => true, 'ts' => $x['ts']] + ($sub !== '' ? ['sub' => $sub] : []) + (empty($x['priv']) ? [] : ['priv' => true]);
         foreach ($msgs as &$y) if (($y['edit'] ?? 0) === $on) unset($y['text']);
         unset($y);
-        $e = ['who' => $me, 'ai' => aiFlag(), 'del' => $on];
+        $e = ['who' => $me, 'ai' => aiFlag(), 'del' => $on] + ($sub !== '' ? ['sub' => $sub] : []);
     }
     if (!empty($x['priv'])) $e['priv'] = true;
     save("t$t", $msgs);
