@@ -75,8 +75,13 @@ textarea{resize:vertical;min-height:46px;max-height:40vh}
 .atb{font-size:12px;font-weight:700;color:var(--acc);margin-right:4px}
 .torow{display:flex;align-items:center;gap:8px}
 .torow #toRow{flex:1}
-#sendkey{flex:none;height:26px;padding:0 10px;border-radius:999px;font-size:12px;background:transparent;color:var(--mute);border:1px solid var(--line)}
-#sendkey:hover{color:var(--ink);border-color:var(--acc)}
+#sendkey{flex:none;display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 4px;font-size:13px;background:transparent;color:var(--mute);border-radius:8px}
+#sendkey:hover{color:var(--ink)}
+#sendkey i{position:relative;width:32px;height:18px;border-radius:999px;background:var(--line);transition:background .15s}
+#sendkey i::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+#sendkey.on i{background:var(--acc)}
+#sendkey.on i::after{transform:translateX(14px)}
+#sendkey.on{color:var(--ink)}
 @media (hover:none) and (pointer:coarse){#sendkey{display:none}}
 #atbtn{flex:none;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 6px 0 12px;border-radius:999px;font-size:15px;animation:atp 1.8s ease-out infinite}
 #atbtn[hidden]{display:none}
@@ -314,7 +319,7 @@ details.arch>summary{cursor:pointer;font-size:13px;color:var(--mute);font-weight
 <div id="msgs"><div id="empty">Выбери тему слева</div></div>
 <form id="compose" hidden>
 <div id="replyBar" hidden><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 6 6v5"/></svg><span></span><button type="button" class="icon" id="replyX"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-<div class="torow"><div id="toRow"></div><button type="button" id="atbtn" hidden title="Ждут твоего решения — к следующему"><b>@</b><span></span></button><button type="button" id="sendkey"></button></div>
+<div class="torow"><div id="toRow"></div><button type="button" id="atbtn" hidden title="Ждут твоего решения — к следующему"><b>@</b><span></span></button><button type="button" id="sendkey"><i></i>Отправка по Enter</button></div>
 <div id="att"></div>
 <div class="row">
 <button type="button" class="icon" id="clip" title="Картинка или видео"><svg viewBox="0 0 24 24"><path d="M21 11l-9 9a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8"/></svg></button>
@@ -846,7 +851,7 @@ let _elp=0;$('#text').addEventListener('pointerdown',e=>{if(e.pointerType==='tou
 ['pointerup','pointermove','pointercancel'].forEach(n=>$('#text').addEventListener(n,()=>clearTimeout(_elp)));
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#emo,#text'))$('#emo').hidden=true});
 let sendEnter=false;try{sendEnter=localStorage.getItem('svyazSendEnter')==='1'}catch(e){}
-const sendKeyShow=()=>{$('#sendkey').textContent='Отправка: '+(sendEnter?'Enter':'Ctrl+Enter');$('#text').placeholder='Сообщение от себя. '+(sendEnter?'Enter — отправить, Shift+Enter — новая строка':'Ctrl+Enter — отправить')};
+const sendKeyShow=()=>{$('#sendkey').classList.toggle('on',sendEnter);$('#sendkey').setAttribute('aria-pressed',sendEnter);$('#text').placeholder='Сообщение от себя. '+(sendEnter?'Enter — отправить, Shift+Enter — новая строка':'Ctrl+Enter — отправить')};
 sendKeyShow();
 $('#sendkey').onclick=()=>{sendEnter=!sendEnter;try{localStorage.setItem('svyazSendEnter',sendEnter?'1':'')}catch(e){}sendKeyShow();$('#text').focus()};
 $('#text').onkeydown=e=>{
