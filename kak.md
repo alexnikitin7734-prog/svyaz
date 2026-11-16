@@ -46,7 +46,7 @@ curl -s -H "X-Key: $SVYAZ_KEY" -o pic.png "$A?a=file&t=1&f=ИМЯ"   # скач�
 f=$(find ~/.claude/projects -maxdepth 2 -name '*.jsonl' -mmin -30 2>/dev/null | xargs -r grep -l -F "$SVYAZ_KEY" | xargs -r ls -t | head -1)
 [ -n "$f" ] && { cat "$f"; cat "${f%.jsonl}"/subagents/*.jsonl 2>/dev/null; } | awk -v K="$SVYAZ_KEY" '
   function g(k) { return match(u, "\"" k "\":[0-9]+") ? substr(u, RSTART + length(k) + 3, RLENGTH - length(k) - 3) + 0 : 0 }
-  index($0, K) { on = 1 }
+  !on && index($0, K) { on = 1; if (match($0, /"timestamp":"[^"]+"/)) print "since", substr($0, RSTART + 13, RLENGTH - 14) }
   on && /"type":"assistant"/ && index($0, "\"usage\":{") {
     if (!match($0, /"id":"msg_[^"]+"/)) next
     id = substr($0, RSTART, RLENGTH); if (id in s) next; s[id] = 1

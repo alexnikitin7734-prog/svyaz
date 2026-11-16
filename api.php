@@ -399,7 +399,7 @@ function worked($t, $me, $ev, $id = 0) {
 
 function usage($t) {
     $r = [];
-    foreach (load('use', [])["t$t"] ?? [] as $n => $u) $r[] = ['n' => $n, 'tok' => $u['tok'], 'usd' => $u['usd']];
+    foreach (load('use', [])["t$t"] ?? [] as $n => $u) $r[] = ['n' => $n, 'tok' => $u['tok'], 'usd' => $u['usd'], 'since' => $u['since'] ?? '', 'hist' => $u['hist'] ?? []];
     return $r;
 }
 
@@ -418,8 +418,10 @@ if ($a === 'usage') {
     if (!$isAI) out(['error' => 'расход шлёт только ИИ'], 403);
     $tok = 0;
     $usd = 0;
+    $since = '';
     foreach (preg_split('/\R/', trim(arg('u'))) as $line) {
         $f = preg_split('/\s+/', trim($line));
+        if (count($f) === 2 && $f[0] === 'since') $since = substr($f[1], 0, 30);
         if (count($f) !== 6) continue;
         $model = $f[0];
         [$in, $rd, $w5, $w1, $o] = array_map('intval', array_slice($f, 1));
@@ -430,7 +432,11 @@ if ($a === 'usage') {
     }
     flock($lock, LOCK_EX);
     $u = load('use', []);
-    $u["t$t"][label($me, true, $sub)] = ['tok' => $tok, 'usd' => round($usd, 2), 'ts' => date('c')];
+    $n = label($me, true, $sub);
+    $old = $u["t$t"][$n] ?? null;
+    $hist = $old['hist'] ?? [];
+    if (($old['since'] ?? '') !== '' && $old['since'] !== $since) $hist = array_slice(array_merge([['since' => $old['since'] ?? '', 'till' => $old['ts'], 'tok' => $old['tok'], 'usd' => $old['usd']]], $hist), 0, 10);
+    $u["t$t"][$n] = ['tok' => $tok, 'usd' => round($usd, 2), 'since' => $since, 'ts' => date('c'), 'hist' => $hist];
     save('use', $u);
     flock($lock, LOCK_UN);
     out(['tok' => $tok, 'usd' => round($usd, 2)]);

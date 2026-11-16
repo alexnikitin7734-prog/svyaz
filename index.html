@@ -98,6 +98,7 @@ textarea{resize:vertical;min-height:46px;max-height:40vh}
 #head h2[contenteditable=true]{outline:2px solid var(--line);border-radius:6px;padding:2px 6px}
 #members{display:flex;gap:6px;flex-wrap:wrap}
 #use{flex-basis:100%;font-size:12px;color:var(--mute)}
+#use summary{cursor:pointer;width:max-content;margin-top:2px}
 .aist{display:none;align-items:center;gap:2px;font-size:11px;line-height:1;padding:2px 6px;border-radius:999px;color:var(--mute);border:1px solid var(--line)}
 .aist.on,.aist.think,.aist.off{display:inline-flex}
 .aist.on{color:var(--acc);border-color:var(--acc)}
@@ -492,8 +493,12 @@ function paintWork(){
 }
 function paintUse(u){
   const tk=n=>n>=1e6?(n/1e6).toFixed(1).replace('.',',')+' млн':n>=1e3?Math.round(n/1e3)+' тыс.':String(n);
+  const dt=s=>s?new Date(s).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(',',''):'?';
+  const sum=x=>tk(x.tok)+' токенов · $'+x.usd.toFixed(2);
+  const was=$('#use details')?.open,h=u.flatMap(x=>x.hist.map(p=>Object.assign({n:x.n},p))).sort((a,b)=>a.till<b.till?1:-1);
   $('#use').hidden=!u.length;
-  $('#use').textContent='Расход ИИ с подключения: '+u.map(x=>x.n+' — '+tk(x.tok)+' токенов · $'+x.usd.toFixed(2)).join(' · ');
+  $('#use').innerHTML=esc('Расход ИИ с подключения: '+u.map(x=>x.n+(x.since?' (с '+dt(x.since)+')':'')+' — '+sum(x)).join(' · '))
+    +(h.length?'<details'+(was?' open':'')+'><summary>Прошлые сессии</summary>'+h.map(p=>'<div>'+esc(p.n+' · '+dt(p.since)+' – '+dt(p.till)+' — '+sum(p))+'</div>').join('')+'</details>':'');
 }
 function paintAist(){
   const t={on:'на связи',think:'думает',off:'не на связи'};
