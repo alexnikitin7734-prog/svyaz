@@ -434,7 +434,7 @@ if ($a === 'usage') {
     $u = load('use', []);
     $n = label($me, true, $sub);
     $old = $u["t$t"][$n] ?? null;
-    $hist = $old['hist'] ?? [];
+    $hist = array_values(array_filter($old['hist'] ?? [], function ($p) use ($since) { return $p['since'] !== $since; }));
     if (($old['since'] ?? '') !== '' && $old['since'] !== $since) $hist = array_slice(array_merge([['since' => $old['since'] ?? '', 'till' => $old['ts'], 'tok' => $old['tok'], 'usd' => $old['usd']]], $hist), 0, 10);
     $u["t$t"][$n] = ['tok' => $tok, 'usd' => round($usd, 2), 'since' => $since, 'ts' => date('c'), 'hist' => $hist];
     save('use', $u);
