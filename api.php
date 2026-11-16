@@ -18,6 +18,10 @@ const REACTS = [
     'cool' => 'прикольно: забавно и симпатично, отвечать не нужно',
 ];
 const AI_RUN = 6;
+// $ за 1M токенов: вход, выход, чтение кэша; запись кэша — вход ×1,25 (5 мин) или ×2 (1 час)
+const PRICES = ['claude-opus-5-5' => [4, 20, 0.2], 'claude-opus-5' => [5, 25, 0.5], 'claude-opus-4' => [5, 25, 0.5],
+    'claude-fable-5-1' => [10, 50, 0.25], 'claude-fable-5' => [10, 50, 1], 'claude-sonnet-5' => [2, 10, 0.2],
+    'claude-sonnet-4' => [3, 15, 0.3], 'claude-haiku-4' => [1, 5, 0.1]];
 
 function holidays($y) {
     $a = $y % 4; $b = $y % 7; $c = $y % 19; $d = (19 * $c + 15) % 30; $e = (2 * $a + 4 * $b - $d + 34) % 7;
@@ -393,8 +397,14 @@ function worked($t, $me, $ev, $id = 0) {
     flock($lock, LOCK_UN);
 }
 
+function usage($t) {
+    $r = [];
+    foreach (load('use', [])["t$t"] ?? [] as $n => $u) $r[] = ['n' => $n, 'tok' => $u['tok'], 'usd' => $u['usd']];
+    return $r;
+}
+
 function live($t, $me) {
-    $l = ['typing' => typing($t, $me), 'work' => work($t)];
+    $l = ['typing' => typing($t, $me), 'work' => work($t), 'usage' => usage($t)];
     return $l + ['lv' => substr(md5(json_encode($l)), 0, 8)];
 }
 
@@ -402,6 +412,28 @@ if ($a === 'typing') {
     if ($isAI) out(['error' => 'печатает только человек'], 403);
     typed($t, $me, true);
     out(['ok' => true]);
+}
+
+if ($a === 'usage') {
+    if (!$isAI) out(['error' => 'расход шлёт только ИИ'], 403);
+    $tok = 0;
+    $usd = 0;
+    foreach (preg_split('/\R/', trim(arg('u'))) as $line) {
+        $f = preg_split('/\s+/', trim($line));
+        if (count($f) !== 6) continue;
+        $model = $f[0];
+        [$in, $rd, $w5, $w1, $o] = array_map('intval', array_slice($f, 1));
+        $tok += $in + $rd + $w5 + $w1 + $o;
+        $p = null;
+        foreach (PRICES as $k => $v) if (strpos($model, $k) === 0 && (!$p || strlen($k) > strlen($p[0]))) $p = [$k, $v];
+        if ($p) $usd += ($in * $p[1][0] + $o * $p[1][1] + $rd * $p[1][2] + $w5 * $p[1][0] * 1.25 + $w1 * $p[1][0] * 2) / 1e6;
+    }
+    flock($lock, LOCK_EX);
+    $u = load('use', []);
+    $u["t$t"][label($me, true, $sub)] = ['tok' => $tok, 'usd' => round($usd, 2), 'ts' => date('c')];
+    save('use', $u);
+    flock($lock, LOCK_UN);
+    out(['tok' => $tok, 'usd' => round($usd, 2)]);
 }
 
 if ($a === 'read' || $a === 'wait') {
@@ -639,4 +671,4 @@ if ($a === 'file') {
     exit;
 }
 
-out(['error' => 'неизвестное действие a, есть: me, people, topics, new, read, wait, post, react, add, rename, archive, file, aikey, invite, forget'], 400);
+out(['error' => 'неизвестное действие a, есть: me, people, topics, new, read, wait, post, react, add, rename, archive, file, aikey, invite, forget, usage'], 400);
