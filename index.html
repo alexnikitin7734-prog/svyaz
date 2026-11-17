@@ -20,6 +20,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-app
 button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:0;border-radius:10px;padding:9px 16px;background:var(--acc);color:#fff}
 button.ghost{background:transparent;color:var(--mute);border:1px solid var(--line)}
+#more{display:block;margin:8px auto}
 button.icon{background:transparent;color:var(--mute);padding:7px;border-radius:8px;display:inline-flex}
 button.icon:hover{background:var(--line);color:var(--ink)}
 svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
@@ -395,7 +396,7 @@ const REACTS=[
   ['cool','прикольно',SV('<path d="M12 3l1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6z"/><path d="M19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7z"/>')],
 ];
 const HUES=[28,210,150,280,340,190,50,0,250,110];
-let KEY='',ME='',got=0,TY='',LV='',WORK=[],_ty=0,ADMIN=false,ADMINS=[],PEOPLE=[],TOPICS=[],T=null,last=0,gen=0,msgs={},R={},RX={},replyTo=0,quoteText='',toSet=new Set(),priv=false,files=[],seen={},shut={},notified={},goneSeen={},HOL={},live=false,atCur=null,_j=0;
+let KEY='',ME='',got=0,TY='',LV='',WORK=[],_ty=0,ADMIN=false,ADMINS=[],PEOPLE=[],TOPICS=[],T=null,last=0,gen=0,msgs={},R={},RX={},replyTo=0,quoteText='',toSet=new Set(),priv=false,files=[],seen={},shut={},notified={},goneSeen={},HOL={},live=false,atCur=null,_j=0,HEAD=0,RS=new Set(),SKIP=null;
 try{KEY=localStorage.getItem('svyazKey')||'';seen=JSON.parse(localStorage.getItem('svyazSeen')||'{}');shut=JSON.parse(localStorage.getItem('svyazShut')||'{}');goneSeen=JSON.parse(localStorage.getItem('svyazGone')||'{}')}catch(e){}
 const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -625,7 +626,7 @@ function redraw(id){
 function addMsg(m){
   const box=$('#msgs');
   if(m.react){
-    const k=m.who+'|'+(m.ai?1:0)+'|'+m.react;R[m.on]=R[m.on]||{};
+    const k=m.who+'|'+(m.ai?1:0)+'|'+m.react,rk=m.on+'|'+k;if(SKIP&&SKIP.has(rk))return;RS.add(rk);R[m.on]=R[m.on]||{};
     if(m.off)delete R[m.on][k];else R[m.on][k]=m;
     if(RX[m.on])renderReacts(RX[m.on]);else{RX[m.id]=m.on;renderReacts(m.on)}
     last=m.id;return;
@@ -706,7 +707,7 @@ const drafts={};
 function saveDraft(){if(T)drafts[T.id]={text:$('#text').value,files:files.slice()}}
 async function open(t){
   saveDraft();if(rec)rec.stop();
-  T=t;AIST={};last=0;got=0;TY='';LV='';WORK=[];_j=0;msgs={};R={};RX={};replyTo=0;quoteText='';toSet=new Set();priv=false;files=[];$('#att').innerHTML='';
+  T=t;AIST={};last=0;got=0;HEAD=0;RS=new Set();TY='';LV='';WORK=[];_j=0;msgs={};R={};RX={};replyTo=0;quoteText='';toSet=new Set();priv=false;files=[];$('#att').innerHTML='';
   const dr=drafts[t.id]||{text:'',files:[]};$('#text').value=dr.text;fit();files=dr.files.slice();renderAtt();$('#replyBar').hidden=true;$('#err2').textContent='';
   const g=++gen;$('#msgs').innerHTML='';$('#head').hidden=false;$('#compose').hidden=false;
   renderHead();renderHol();$('#app').classList.add('open');
@@ -714,14 +715,29 @@ async function open(t){
   let first=true;
   while(g===gen){
     try{
-      const r=await api({a:'read',t:T.id,since:last,wait:first?0:20,lv:LV});
+      const r=await api(Object.assign({a:'read',t:T.id,since:last,wait:first?0:20,lv:LV},first?{tail:200}:{}));
       if(g!==gen)break;
       AIST=r.ai_state||{};paintAist();TY=(r.typing||[]).join(',');paintTy();LV=r.lv||'';WORK=r.work||[];paintUse(r.usage||[]);
       const box=$('#msgs'),down=first||box.scrollHeight-box.scrollTop-box.clientHeight<80;
-      live=!first;got+=r.messages.length;r.messages.forEach(addMsg);paintWork();if(first)renderAt();if(down)box.scrollTop=box.scrollHeight;first=false;
+      live=!first;if(first){got=r.skip||0;_j=r.j||0}got+=r.messages.length;r.messages.forEach(addMsg);if(first&&r.skip)moreBtn(r);paintWork();if(first)renderAt();if(down)box.scrollTop=box.scrollHeight;first=false;
       if(!document.hidden){seen[T.id]=got;store('svyazSeen',seen)}
     }catch(e){if(e.status===410){if(g===gen)goneHere(e.message.split('. Слежку')[0]);break}await new Promise(r=>setTimeout(r,5000))}
   }
+}
+function moreBtn(r){
+  HEAD=r.messages.length?r.messages[0].id:HEAD;
+  const b=document.createElement('button');b.type='button';b.className='ghost';b.id='more';b.textContent='Раньше';b.onclick=earlier;$('#msgs').prepend(b);
+}
+async function earlier(){
+  const b=$('#more'),g=gen;b.disabled=true;
+  try{
+    const r=await api({a:'read',t:T.id,since:0,tail:200,before:HEAD});if(g!==gen)return;
+    const box=$('#msgs'),h=box.scrollHeight,top=box.scrollTop,keep=document.createDocumentFragment();b.remove();
+    while(box.firstChild)keep.append(box.firstChild);
+    const l=last,j=_j,lv=live;live=false;_j=r.j||0;SKIP=new Set(RS);
+    try{r.messages.forEach(addMsg)}finally{SKIP=null;last=l;_j=j;live=lv}
+    box.append(keep);if(r.skip)moreBtn(r);box.scrollTop=top+box.scrollHeight-h;
+  }catch(e){b.disabled=false;$('#err2').textContent=e.message}
 }
 try{const w=+localStorage.getItem('svyazSide');if(w)document.documentElement.style.setProperty('--sw',w+'px')}catch(e){}
 $('#sgrip').onpointerdown=e=>{

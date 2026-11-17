@@ -463,6 +463,22 @@ if ($a === 'read' || $a === 'wait') {
         if ($hit || time() >= $end) break;
         sleep(1);
     }
+    $page = [];
+    if ($a === 'read' && ($tail = (int)arg('tail')) > 0) {
+        $before = (int)arg('before');
+        $to = 0;
+        while ($to < count($msgs) && (!$before || $msgs[$to]['id'] < $before)) $to++;
+        $k = $to;
+        for ($c = 0; $k > 0 && $c < $tail;) if (!isset($msgs[--$k]['react']) && !isset($msgs[$k]['edit']) && !isset($msgs[$k]['del'])) $c++;
+        $j = 0;
+        foreach (array_slice($msgs, 0, $k) as $m) {
+            if (isset($m['react']) || isset($m['edit']) || isset($m['del']) || !empty($m['gone'])) continue;
+            if (!empty($m['sys'])) { if (preg_match('/позвал|убрал\(а\) из/u', $m['text'])) $j = 0; continue; }
+            $j++;
+        }
+        $new = array_slice($msgs, $k, $to - $k);
+        $page = ['skip' => $k, 'j' => $j];
+    }
     if ($isAI && $sub === '' && $a === 'wait') {
         pres($t, $me, $hit ? 'hit' : 'idle');
         $on = 0;
@@ -474,7 +490,7 @@ if ($a === 'read' || $a === 'wait') {
         exit;
     }
     $topic = load('topics', [])[$ti];
-    out(['topic' => $topic, 'me' => $me, 'my_ai' => label($me, true, $sub), 'holiday' => holidayOn(today()), 'ai_state' => presence($t, $topic['members'])] + live($t, $me) + ['messages' => array_map('view', $new)]);
+    out(['topic' => $topic, 'me' => $me, 'my_ai' => label($me, true, $sub), 'holiday' => holidayOn(today()), 'ai_state' => presence($t, $topic['members'])] + live($t, $me) + $page + ['messages' => array_map('view', $new)]);
 }
 
 if ($a === 'post') {
