@@ -253,12 +253,23 @@ function calls($msgs, $me) {
     return $c;
 }
 
+function aiRun($msgs) {
+    $run = 0;
+    foreach (array_reverse($msgs) as $x) {
+        if (!empty($x['sys']) || isset($x['react']) || isset($x['edit']) || isset($x['del']) || !empty($x['priv'])) continue;
+        if (!$x['ai']) break;
+        $run++;
+    }
+    return $run;
+}
+
 if ($a === 'topics') {
     $my = array_values(array_filter($topics, function ($t) use ($me) { return in_array($me, $t['members']); }));
     foreach ($my as &$x) {
         $ms = mine(load("t{$x['id']}", []), $me);
         $x['count'] = count($ms);
         $x['calls'] = calls($ms, $me);
+        $x['ai_wait'] = aiRun($ms) >= AI_RUN;
         $x['ais'] = [];
         $all = load('ais', []);
         foreach ($ms as $m) if (!empty($m['sub']) && in_array($m['who'], $x['members']) && in_array($m['sub'], $all[$m['who']] ?? []) && !in_array($m['sub'], $x['ais'][$m['who']] ?? [])) $x['ais'][$m['who']][] = $m['sub'];
@@ -490,7 +501,7 @@ if ($a === 'read' || $a === 'wait') {
         exit;
     }
     $topic = load('topics', [])[$ti];
-    out(['topic' => $topic, 'me' => $me, 'my_ai' => label($me, true, $sub), 'holiday' => holidayOn(today()), 'ai_state' => presence($t, $topic['members'])] + live($t, $me) + $page + ['messages' => array_map('view', $new)]);
+    out(['topic' => $topic, 'me' => $me, 'my_ai' => label($me, true, $sub), 'holiday' => holidayOn(today()), 'ai_state' => presence($t, $topic['members']), 'ai_wait' => aiRun($msgs) >= AI_RUN] + live($t, $me) + $page + ['messages' => array_map('view', $new)]);
 }
 
 if ($a === 'post') {
@@ -530,13 +541,7 @@ if ($a === 'post') {
         }
     }
     if (aiFlag()) {
-        $run = 0;
-        foreach (array_reverse(load("t$t", [])) as $x) {
-            if (!empty($x['sys']) || isset($x['react']) || isset($x['edit']) || isset($x['del']) || !empty($x['priv'])) continue;
-            if (!$x['ai']) break;
-            $run++;
-        }
-        if ($run >= AI_RUN) out(['error' => 'ИИ уже написали ' . AI_RUN . ' сообщений подряд — дождись, пока ответит человек', 'limit' => true], 429);
+        if (aiRun(load("t$t", [])) >= AI_RUN) out(['error' => 'ИИ уже написали ' . AI_RUN . ' сообщений подряд — дождись, пока ответит человек', 'limit' => true], 429);
     }
     if (aiFlag() && (int)arg('reply')) foreach (load("t$t", []) as $x) if ($x['id'] === (int)arg('reply') && !own($x) && !empty($x['to']) && !in_array(label($me, true, $sub), $x['to'])) out(['error' => '№' . $x['id'] . ' адресовано ' . implode(', ', $x['to']) . ', не тебе — не отвечай, читай для контекста'], 409);
     $m = ['who' => $me, 'ai' => aiFlag(), 'text' => mb_substr($text, 0, 20000)] + ($sub !== '' ? ['sub' => $sub] : []);

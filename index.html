@@ -74,6 +74,7 @@ textarea{resize:vertical;min-height:46px;max-height:40vh}
 @keyframes tw{from{opacity:.25}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.n7 #main::after{animation:none}.q8 svg{animation:none;stroke-dashoffset:0}.m3{display:none}}
 .atb{font-size:12px;font-weight:700;color:var(--acc);margin-right:4px}
+.aiw{font-size:13px;font-weight:800;color:#d64b4b;margin-right:4px}
 .torow{display:flex;align-items:center;gap:8px}
 .torow #toRow{flex:1}
 #sendkey{flex:none;display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 4px;font-size:13px;background:transparent;color:var(--mute);border-radius:8px}
@@ -207,6 +208,7 @@ textarea{resize:vertical;min-height:46px;max-height:40vh}
 #compose{padding:10px 24px 16px;display:grid;gap:8px;border-top:1px solid var(--line)}
 #send svg{display:none;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 #replyBar{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mute)}
+#aiwait{font-size:13px;font-weight:600;color:#d64b4b}
 #replyBar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toRow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--mute)}
 #toRow .chip{cursor:pointer;color:var(--ink)}
@@ -327,6 +329,7 @@ details.arch>summary{cursor:pointer;font-size:13px;color:var(--mute);font-weight
 <div id="hol" hidden><b></b><span></span><button type="button" id="holgo" hidden>Поздравить</button><button type="button" class="icon" id="holx" title="Скрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div id="msgs"><div id="empty">Выбери тему слева</div></div>
 <form id="compose" hidden>
+<div id="aiwait" hidden>ИИ ждут вашего ответа</div>
 <div id="replyBar" hidden><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 6 6v5"/></svg><span></span><button type="button" class="icon" id="replyX"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div class="torow"><div id="toRow"></div><button type="button" id="atbtn" hidden title="Ждут твоего решения — к следующему"><b>@</b><span></span></button><button type="button" id="sendkey"><i></i>Отправка по Enter</button></div>
 <div id="att"></div>
@@ -462,7 +465,7 @@ async function loadTopics(){
     for(const t of g.ts.sort((a,b)=>b.last.localeCompare(a.last))){
       const un=Math.max(0,t.count-(seen[t.id]||0));gun+=un;
       const d=document.createElement('div');d.className='topic'+(T&&t.id===T.id?' on':'');
-      d.innerHTML='<div class="tt"><div>'+esc(t.title)+'</div><small>№'+t.id+' · '+fmt(t.last)+'</small></div>'+(pend(t).length?'<span class="atb">@</span>':'')+(un?'<span class="badge">'+un+'</span>':'');
+      d.innerHTML='<div class="tt"><div>'+esc(t.title)+'</div><small>№'+t.id+' · '+fmt(t.last)+'</small></div>'+(t.ai_wait?'<span class="aiw" title="ИИ ждут человека">!</span>':'')+(pend(t).length?'<span class="atb">@</span>':'')+(un?'<span class="badge">'+un+'</span>':'');
       d.onclick=()=>open(t);d.oncontextmenu=e=>{e.preventDefault();topicMenu(t,e.clientX,e.clientY)};gd.append(d);
     }
     if(gun){const b=h.querySelector('.badge');b.hidden=false;b.textContent=gun}
@@ -722,7 +725,7 @@ function saveDraft(){if(T)drafts[T.id]={text:$('#text').value,files:files.slice(
 async function open(t){
   saveDraft();if(rec)rec.stop();
   T=t;AIST={};last=0;got=0;HEAD=0;RS=new Set();TY='';LV='';WORK=[];_j=0;msgs={};R={};RX={};replyTo=0;quoteText='';toSet=new Set();priv=false;files=[];$('#att').innerHTML='';
-  const dr=drafts[t.id]||{text:'',files:[]};$('#text').value=dr.text;fit();files=dr.files.slice();renderAtt();$('#replyBar').hidden=true;$('#err2').textContent='';
+  const dr=drafts[t.id]||{text:'',files:[]};$('#text').value=dr.text;fit();files=dr.files.slice();renderAtt();$('#replyBar').hidden=true;$('#aiwait').hidden=true;$('#err2').textContent='';
   const g=++gen;$('#msgs').innerHTML='';$('#head').hidden=false;$('#compose').hidden=false;
   renderHead();renderHol();$('#app').classList.add('open');
   seen[t.id]=t.count;store('svyazSeen',seen);loadTopics();
@@ -731,7 +734,7 @@ async function open(t){
     try{
       const r=await api(Object.assign({a:'read',t:T.id,since:last,wait:first?0:20,lv:LV},first?{tail:200}:{}));
       if(g!==gen)break;
-      AIST=r.ai_state||{};paintAist();TY=(r.typing||[]).join(',');paintTy();LV=r.lv||'';WORK=r.work||[];paintUse(r.usage||[]);
+      AIST=r.ai_state||{};paintAist();$('#aiwait').hidden=!r.ai_wait;TY=(r.typing||[]).join(',');paintTy();LV=r.lv||'';WORK=r.work||[];paintUse(r.usage||[]);
       const box=$('#msgs'),down=first||box.scrollHeight-box.scrollTop-box.clientHeight<80;
       live=!first;if(first){got=r.skip||0;_j=r.j||0}got+=r.messages.length;r.messages.forEach(addMsg);if(first&&r.skip)moreBtn(r);paintWork();if(first)renderAt();if(down)box.scrollTop=box.scrollHeight;first=false;
       if(!document.hidden){seen[T.id]=got;store('svyazSeen',seen)}
