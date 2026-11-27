@@ -500,6 +500,8 @@ if ($a === 'read' || $a === 'wait') {
         http_response_code(204);
         exit;
     }
+    if ($isAI) foreach ($new as &$m) if (!empty($m['priv']) && empty($m['ai']) && isset($m['text']) && !isset($m['react'])) $m['text'] = "[шёпот — ответь priv=1]\n" . $m['text'];
+    unset($m);
     $topic = load('topics', [])[$ti];
     out(['topic' => $topic, 'me' => $me, 'my_ai' => label($me, true, $sub), 'holiday' => holidayOn(today()), 'ai_state' => presence($t, $topic['members']), 'ai_wait' => aiRun($msgs) >= AI_RUN] + live($t, $me) + $page + ['messages' => array_map('view', $new)]);
 }
