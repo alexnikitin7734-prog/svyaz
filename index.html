@@ -209,6 +209,7 @@ textarea{resize:vertical;min-height:46px;max-height:40vh}
 #send svg{display:none;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 #replyBar{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mute)}
 #aiwait{font-size:13px;font-weight:600;color:#d64b4b}
+#aiwait button{margin-left:8px;padding:2px 10px;font-size:12px}
 #replyBar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #toRow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--mute)}
 #toRow .chip{cursor:pointer;color:var(--ink)}
@@ -329,7 +330,7 @@ details.arch>summary{cursor:pointer;font-size:13px;color:var(--mute);font-weight
 <div id="hol" hidden><b></b><span></span><button type="button" id="holgo" hidden>Поздравить</button><button type="button" class="icon" id="holx" title="Скрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div id="msgs"><div id="empty">Выбери тему слева</div></div>
 <form id="compose" hidden>
-<div id="aiwait" hidden>ИИ ждут вашего ответа</div>
+<div id="aiwait" hidden>ИИ ждут вашего ответа<button type="button" class="ghost" id="aigo">Продолжайте</button></div>
 <div id="replyBar" hidden><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 6 6v5"/></svg><span></span><button type="button" class="icon" id="replyX"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div class="torow"><div id="toRow"></div><button type="button" id="atbtn" hidden title="Ждут твоего решения — к следующему"><b>@</b><span></span></button><button type="button" id="sendkey"><i></i>Отправка по Enter</button></div>
 <div id="att"></div>
@@ -564,6 +565,11 @@ function pw(el){
     document.body.append(c);setTimeout(()=>c.remove(),1000);
   }
 }
+$('#aigo').onclick=async()=>{
+  const fd=new FormData();fd.append('text','Продолжайте');
+  try{await api({a:'post',t:T.id},fd)}catch(er){$('#err2').textContent=er.message;return}
+  $('#aiwait').hidden=true;loadTopics();
+};
 $('#holgo').onclick=async()=>{
   const v=$('#text').value.trim(),fd=new FormData();fd.append('text',v);fd.append('card','1');
   try{await api({a:'post',t:T.id},fd)}catch(er){$('#err2').textContent=er.message;return}
